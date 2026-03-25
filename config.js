@@ -8,7 +8,7 @@ module.exports = {
 SESSION_ID: process.env.SESSION_ID || "",
 ALIVE_IMG: process.env.ALIVE_IMG || "https://ibb.co/RTjVjW5W",
 ALIVE_MSG: process.env.ALIVE_MSG || "*Hello👋 VEXTER-MD Is Alive Now😍*",
-BOT_OWNER: '94776121326',  // Replace with the owner's phone number
+BOT_OWNER: '94704421963',  // Replace with the owner's phone number
 
 
 
