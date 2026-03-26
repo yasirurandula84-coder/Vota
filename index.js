@@ -179,33 +179,13 @@ async function connectToWA() {
 
 ensureSessionFile();
 
-app.get("/", (req, res) => {
-  res.send("👋 HELLOW, DEXTER-MD started✅");
-});
-// --- Sinhalasub API Route ---
 app.get("/api/movie", async (req, res) => {
-    try {
-        const query = req.query.q; // මෙතනින් තමයි සර්ච් කරන නම (q) අරගන්නේ
-        
-        if (!query) {
-            return res.status(400).json({ 
-                status: false, 
-                message: "කරුණාකර චිත්‍රපටයේ නම ඇතුළත් කරන්න. (උදා: /api/movie?q=Avatar)" 
-            });
-        }
-
-        // අපි අර හදපු api/sinhalasub.js එකේ function එකට call කරනවා
-        const results = await getMovieData(query);
-
-        // ප්‍රතිඵල JSON එකක් විදිහට එළියට දෙනවා
-        res.json({
-            status: true,
-            creator: "VEXTER-MD",
-            results: results
-        });
-
-    } catch (e) {
-        res.status(500).json({ status: false, error: e.message });
-    }
+    const q = req.query.q;
+    const data = await getMovieData(q);
+    
+    console.log("API Requested for:", q);
+    console.log("Results Found:", data.length); // මෙතන 0 ට වඩා වැඩි අගයක් එන්න ඕනේ
+    
+    res.json({ status: true, results: data });
 });
 app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
