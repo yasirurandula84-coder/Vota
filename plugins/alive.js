@@ -4,7 +4,7 @@ const config = require('../config');
 cmd({
     pattern: "alive",
     desc: "Check bot online or no.",
-    category: "main",
+    category: "owner",
     filename: __filename
 },
 async (danuwa, mek, m, {
