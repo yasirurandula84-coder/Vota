@@ -1,78 +1,71 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const qs = require('qs');
 
 async function getMovieData(query) {
     try {
-        const searchUrl = `https://sinhalasub.lk/feed/?s=${encodeURIComponent(query)}`;
-        const { data } = await axios.get(searchUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        // 1. මුලින්ම සර්ච් එක කරලා Movie Page URL එක ගන්නවා
+        const searchUrl = `https://sinhalasub.lk/?s=${encodeURIComponent(query)}`;
+        const searchRes = await axios.get(searchUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const $ = cheerio.load(searchRes.data);
+        
+        const firstMovie = $('article a').first().attr('href');
+        if (!firstMovie) return [];
 
-        const $ = cheerio.load(data, { xmlMode: true });
-        const results = [];
-        const items = $('item').get().slice(0, 5);
+        // 2. Movie Page එකට ගිහින් එතන තියෙන "Post ID" එක ගන්නවා
+        const moviePage = await axios.get(firstMovie, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const $$ = cheerio.load(moviePage.data);
+        
+        // පෝස්ට් එකේ ID එක හොයාගන්නවා (මෙය ලින්ක්ස් ජෙනරේට් කරන්න ඕනේ)
+        const postId = $$('link[rel="shortlink"]').attr('href')?.split('p=')[1] || 
+                       $$('article').attr('id')?.replace('post-', '');
 
-        for (const el of items) {
-            const title = $(el).find('title').text();
-            const movieUrl = $(el).find('link').text();
-            
-            if (movieUrl) {
-                try {
-                    const innerRes = await axios.get(movieUrl, { 
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
-                    });
-                    const html = innerRes.data;
-                    const $$ = cheerio.load(html);
+        if (!postId) return [];
 
-                    const dl_links = [];
+        const dl_links = [];
 
-                    // --- NEW LOGIC: Pixeldrain ID extraction via String manipulation ---
-                    // සයිට් එකේ Buttons වල තියෙන base64 encoded ලින්ක්ස් සෙවීම
-                    const regex = /"link":"([a-zA-Z0-9+/=]+)"/g;
-                    let match;
-                    while ((match = regex.exec(html)) !== null) {
-                        try {
-                            const decoded = Buffer.from(match[1], 'base64').toString('utf-8');
-                            if (decoded.includes('pixeldrain.com/u/')) {
-                                const pId = decoded.split('/u/')[1].split('?')[0];
-                                const pUrl = `https://pixeldrain.com/u/${pId}`;
-                                
-                                if (!dl_links.some(l => l.url === pUrl)) {
-                                    // Quality එක අනුමාන කිරීම (Context එක අනුව)
-                                    let quality = "HD";
-                                    if (html.includes(match[1])) {
-                                        const segment = html.substring(html.indexOf(match[1]) - 300, html.indexOf(match[1]));
-                                        if (segment.includes('720p')) quality = "720p";
-                                        else if (segment.includes('1080p')) quality = "1080p";
-                                        else if (segment.includes('480p')) quality = "480p";
-                                    }
-                                    dl_links.push({ quality, url: pUrl });
-                                }
-                            }
-                        } catch (e) {}
-                    }
+        // 3. සයිට් එකේ AJAX API එකට කතා කරලා Pixeldrain ලින්ක්ස් ටික බලෙන් ගන්නවා
+        // මේක තමයි සයිට් එකේ ලින්ක්ස් හංගලා තියෙන තැන
+        try {
+            const ajaxUrl = 'https://sinhalasub.lk/wp-admin/admin-ajax.php';
+            const response = await axios.post(ajaxUrl, qs.stringify({
+                action: 'get_download_links', // මෙය සයිට් එකේ පාවිච්චි කරන ඇක්ෂන් එක විය හැක
+                post_id: postId
+            }), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Mozilla/5.0' }
+            });
 
-                    // අවසාන විසඳුම: මුළු HTML එකේම පීරලා Pixeldrain ID එක සෙවීම
-                    if (dl_links.length === 0) {
-                        const directRegex = /pixeldrain\.com\/u\/([a-zA-Z0-9]+)/g;
-                        let dMatch;
-                        while ((dMatch = directRegex.exec(html)) !== null) {
-                            const dUrl = `https://pixeldrain.com/u/${dMatch[1]}`;
-                            if (!dl_links.some(l => l.url === dUrl)) {
-                                dl_links.push({ quality: "HD", url: dUrl });
-                            }
-                        }
-                    }
-
-                    results.push({
-                        title: title.replace(' - Sinhala Subtitles', '').trim(),
-                        thumbnail: $$('meta[property="og:image"]').attr('content') || "",
-                        year: title.match(/\d{4}/) ? title.match(/\d{4}/)[0] : "N/A",
-                        dl_links: dl_links
-                    });
-                } catch (e) { continue; }
+            // ලැබෙන දත්ත ඇතුළේ Pixeldrain ලින්ක්ස් තියෙනවද බලනවා
+            const htmlContent = JSON.stringify(response.data);
+            const pdRegex = /https:\/\/pixeldrain\.com\/u\/([a-zA-Z0-9]+)/g;
+            let match;
+            while ((match = pdRegex.exec(htmlContent)) !== null) {
+                dl_links.push({
+                    quality: "HD",
+                    url: match[0]
+                });
+            }
+        } catch (e) {
+            // AJAX එක වැඩ නොකළොත් HTML එක ඇතුළේ හැංගිලා තියෙන ඒවාවත් අදිනවා
+            const pageHtml = moviePage.data;
+            const pdRegex2 = /pixeldrain\.com\/u\/([a-zA-Z0-9]+)/g;
+            let match2;
+            while ((match2 = pdRegex2.exec(pageHtml)) !== null) {
+                dl_links.push({ quality: "HD", url: `https://pixeldrain.com/u/${match2[1]}` });
             }
         }
-        return results;
-    } catch (err) { return []; }
+
+        return [{
+            title: $$('h1.entry-title').text().trim() || "Movie Found",
+            thumbnail: $$('meta[property="og:image"]').attr('content') || "",
+            year: $$('.year').text().trim() || "N/A",
+            dl_links: [...new Set(dl_links.map(JSON.stringify))].map(JSON.parse) // Unique links only
+        }];
+
+    } catch (err) {
+        console.error("Critical Scraper Error:", err.message);
+        return [];
+    }
 }
 
 module.exports = { getMovieData };
