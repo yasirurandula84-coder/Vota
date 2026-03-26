@@ -23,7 +23,7 @@ cmd(
     category: "download",
     filename: __filename,
   },
-  async (bot, mek, m, { from, q, reply }) => {
+  async (conn, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("🎵 Send song name or YouTube link");
 
@@ -38,7 +38,7 @@ cmd(
         `👀 Views: ${video.views.toLocaleString()}\n` +
         `🔗 ${video.url}`;
 
-      await bot.sendMessage(
+      await conn.sendMessage(
         from,
         {
           image: { url: video.thumbnail },
@@ -52,7 +52,7 @@ cmd(
       const data = await ytmp3(video.url);
       if (!data?.url) return reply("❌ Failed to download MP3");
 
-      await bot.sendMessage(
+      await conn.sendMessage(
         from,
         {
           audio: { url: data.url },
@@ -76,7 +76,7 @@ cmd(
     category: "download",
     filename: __filename,
   },
-  async (bot, mek, m, { from, q, reply }) => {
+  async (conn, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("🎬 Send video name or YouTube link");
 
@@ -92,7 +92,7 @@ cmd(
         `📅 Uploaded: ${video.ago}\n` +
         `🔗 ${video.url}`;
 
-      await bot.sendMessage(
+      await conn.sendMessage(
         from,
         {
           image: { url: video.thumbnail },
@@ -110,7 +110,7 @@ cmd(
 
       if (!data?.url) return reply("❌ Failed to download video");
 
-await bot.sendMessage(
+await conn.sendMessage(
   from,
   {
     video: { url: data.url },
@@ -138,7 +138,7 @@ cmd(
     category: "download",
     filename: __filename,
   },
-  async (bot, mek, m, { from, q, reply }) => {
+  async (conn, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("📱 Send TikTok link");
 
@@ -153,7 +153,7 @@ cmd(
         `👤 Author: ${data.author || "Unknown"}\n` +
         `⏱ Duration: ${data.runtime}s`;
 
-      await bot.sendMessage(
+      await conn.sendMessage(
         from,
         {
           video: { url: data.no_watermark },
