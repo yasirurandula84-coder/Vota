@@ -40,7 +40,7 @@ cmd(
         from,
         {
           image: {
-            url: "",
+            url: "https://i.ibb.co/ZRXhhYxH/db1c9ed7-6513-49da-8105-f21c73583135.png",
           },
           caption: header,
         },
