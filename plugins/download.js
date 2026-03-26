@@ -5,12 +5,16 @@ const yts = require("yt-search");
 
 
 async function getYoutube(query) {
-    try {
-        const search = await yts(query);
-        return search.videos.length > 0 ? search.videos[0] : null;
-    } catch (e) {
-        return null;
-    }
+  const isUrl = /(youtube\.com|youtu\.be)/i.test(query);
+  if (isUrl) {
+    const id = query.split("v=")[1] || query.split("/").pop();
+    const info = await yts({ videoId: id });
+    return info;
+  }
+
+  const search = await yts(query);
+  if (!search.videos.length) return null;
+  return search.videos[0];
 }
 
 
@@ -18,12 +22,11 @@ cmd(
   {
     pattern: "ytmp3",
     alias: ["yta", "song"],
-    react: "🎵",
     desc: "Download YouTube MP3 by name or link",
     category: "download",
     filename: __filename,
   },
-  async (conn, mek, m, { from, q, reply }) => {
+  async (bot, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("🎵 Send song name or YouTube link");
 
@@ -38,7 +41,7 @@ cmd(
         `👀 Views: ${video.views.toLocaleString()}\n` +
         `🔗 ${video.url}`;
 
-      await conn.sendMessage(
+      await bot.sendMessage(
         from,
         {
           image: { url: video.thumbnail },
@@ -52,7 +55,7 @@ cmd(
       const data = await ytmp3(video.url);
       if (!data?.url) return reply("❌ Failed to download MP3");
 
-      await conn.sendMessage(
+      await bot.sendMessage(
         from,
         {
           audio: { url: data.url },
@@ -71,12 +74,11 @@ cmd(
   {
     pattern: "ytmp4",
     alias: ["ytv", "video"],
-    react: "🎥",
     desc: "Download YouTube MP4 by name or link",
     category: "download",
     filename: __filename,
   },
-  async (conn, mek, m, { from, q, reply }) => {
+  async (bot, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("🎬 Send video name or YouTube link");
 
@@ -92,7 +94,7 @@ cmd(
         `📅 Uploaded: ${video.ago}\n` +
         `🔗 ${video.url}`;
 
-      await conn.sendMessage(
+      await bot.sendMessage(
         from,
         {
           image: { url: video.thumbnail },
@@ -110,13 +112,13 @@ cmd(
 
       if (!data?.url) return reply("❌ Failed to download video");
 
-await conn.sendMessage(
+await bot.sendMessage(
   from,
   {
     video: { url: data.url },
     mimetype: "video/mp4",
     fileName: data.filename || "youtube_video.mp4",
-    caption: "🎬 VERTEX-MD VIDEO DOWNLOAD",
+    caption: "🎬 YouTube video",
     gifPlayback: false,
   },
   { quoted: mek }
@@ -133,12 +135,11 @@ cmd(
   {
     pattern: "tiktok",
     alias: ["tt"],
-    react: "☢️",
     desc: "Download TikTok video",
     category: "download",
     filename: __filename,
   },
-  async (conn, mek, m, { from, q, reply }) => {
+  async (bot, mek, m, { from, q, reply }) => {
     try {
       if (!q) return reply("📱 Send TikTok link");
 
@@ -153,7 +154,7 @@ cmd(
         `👤 Author: ${data.author || "Unknown"}\n` +
         `⏱ Duration: ${data.runtime}s`;
 
-      await conn.sendMessage(
+      await bot.sendMessage(
         from,
         {
           video: { url: data.no_watermark },
@@ -168,4 +169,3 @@ cmd(
   }
 );
 
-            
