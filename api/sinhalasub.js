@@ -21,55 +21,51 @@ async function getMovieData(query) {
                     const innerRes = await axios.get(movieUrl, { 
                         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
                     });
-                    const $$ = cheerio.load(innerRes.data);
+                    const html = innerRes.data;
+                    const $$ = cheerio.load(html);
 
-                    // 1. Thumbnail එක ගැනීම
-                    const thumb = $$('meta[property="og:image"]').attr('content') || $$('img.wp-post-image').attr('src');
-                    
-                    // 2. Year එක ගැනීම (පෝස්ට් එකේ තියෙන අවුරුද්ද)
-                    const yearText = $$('.year, .date, .release-date').text().trim();
-                    const yearMatch = yearText.match(/\d{4}/); // ඉලක්කම් 4ක අවුරුද්දක් සොයන්න
-                    const finalYear = yearMatch ? yearMatch[0] : "N/A";
+                    // 1. Year එක ගැනීම (Title එකෙන් හෝ Content එකෙන්)
+                    let finalYear = "N/A";
+                    const yearMatch = title.match(/\d{4}/) || html.match(/\b(19|20)\d{2}\b/);
+                    if (yearMatch) finalYear = yearMatch[0];
 
-                    // 3. ඩවුන්ලෝඩ් ලින්ක්ස් ගැනීම (Direct Pixeldrain Search)
+                    // 2. Pixeldrain ලින්ක්ස් ගැනීම (HTML එක ඇතුළේ ඇති සියලුම Pixeldrain ලින්ක්ස් සොයයි)
                     const dl_links = [];
-                    $$('a').each((i, link) => {
-                        const href = $$(link).attr('href');
-                        if (href && href.includes('pixeldrain.com')) {
-                            const linkText = $$(link).text().toLowerCase();
-                            
-                            // Quality එක සොයා ගැනීම (Link එකේ Text එකෙන්)
-                            let quality = "HD";
-                            if (linkText.includes('480')) quality = "480p";
-                            else if (linkText.includes('720')) quality = "720p";
-                            else if (linkText.includes('1080')) quality = "1080p";
+                    const pixeldrainRegex = /https:\/\/pixeldrain\.com\/u\/[a-zA-Z0-9]+/g;
+                    const linksFound = html.match(pixeldrainRegex);
 
-                            dl_links.push({
-                                quality: quality,
-                                size: "Check Link",
-                                url: href
-                            });
-                        }
-                    });
+                    if (linksFound) {
+                        // Unique ලින්ක්ස් පමණක් තබා ගැනීම
+                        const uniqueLinks = [...new Set(linksFound)];
+                        uniqueLinks.forEach((link, i) => {
+                            // ලින්ක් එක තියෙන තැන අවට Quality එක සෙවීම
+                            let quality = "HD";
+                            if (html.includes(link)) {
+                                const pos = html.indexOf(link);
+                                const context = html.substring(pos - 100, pos).toLowerCase();
+                                if (context.includes('480')) quality = "480p";
+                                else if (context.includes('720')) quality = "720p";
+                                else if (context.includes('1080')) quality = "1080p";
+                            }
+                            dl_links.push({ quality, size: "N/A", url: link });
+                        });
+                    }
 
                     results.push({
                         title: title.replace(' - Sinhala Subtitles', '').trim(),
                         link: movieUrl,
-                        thumbnail: thumb,
+                        thumbnail: $$('meta[property="og:image"]').attr('content') || "",
                         imdb: $$('.data-imdb').text().replace('IMDb:', '').trim() || "N/A",
                         year: finalYear,
                         description: $$('.wp-content p').first().text().trim().substring(0, 200) + "...",
                         genres: $$('.details-genre a').map((i, g) => $$(g).text()).get(),
-                        cast: $$('.info-col p:contains("Stars:") a').map((i, s) => $$(s).text()).get(),
-                        dl_links: dl_links
+                        dl_links
                     });
                 } catch (e) { continue; }
             }
         }
         return results;
-    } catch (err) {
-        return [];
-    }
+    } catch (err) { return []; }
 }
 
 module.exports = { getMovieData };
