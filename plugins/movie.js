@@ -1,130 +1,91 @@
-const { cmd } = require("../command");
+const { cmd, commands, replyHandlers } = require("../command");
 const axios = require("axios");
-const cheerio = require("cheerio");
 
-// Session දත්ත තබා ගැනීමට
-global.movie_sessions = global.movie_sessions || {};
+// තාවකාලිකව දත්ත ගබඩා කිරීමට (Sessions)
+global.movie_api_sessions = global.movie_api_sessions || {};
 
-// 1. සෙවුම් විධානය
 cmd({
     pattern: "movie",
-    alias: ["films", "cinema"],
-    react: "🎬",
-    desc: "Search movies from Sinhalasub.lk (Updated 2026)",
+    alias: ["film", "cinema"],
     category: "movie",
-    filename: __filename
-}, async (conn, mek, m, { from, q, sender, reply }) => {
+    react: "🎬",
+    desc: "Search movies using VEXTER-MD API"
+}, async (conn, mek, m, { from, q, reply, sender }) => {
+    if (!q) return reply("🎬 කරුණාකර චිත්‍රපටයේ නම ලබා දෙන්න. (උදා: .movie Avatar)");
+
     try {
-        if (!q) return reply("*🎬 Please provide a movie name!* (e.g., .movie Avatar)");
+        await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
 
-        reply("*🔍 Searching Sinhalasub... Please wait.*");
-        
-        // සයිට් එකට Request එකක් යැවීම
-        const res = await axios.get(`https://sinhalasub.lk/?s=${encodeURIComponent(q)}`, {
-            headers: { 'User-Agent': 'Mozilla/5.0' } // සයිට් එකෙන් Block නොකිරීමට
+        // ඔයා දැන් හදපු API එකට Call කරනවා (Render එකේදී localhost පාවිච්චි කළ හැක)
+        const apiUrl = `http://localhost:8000/api/movie?q=${encodeURIComponent(q)}`;
+        const response = await axios.get(apiUrl);
+        const data = response.data;
+
+        if (!data.status || data.results.length === 0) return reply("❌ කිසිදු ප්‍රතිඵලයක් හමු නොවීය.");
+
+        // සෙවුම් ප්‍රතිඵල Session එකට දානවා
+        global.movie_api_sessions[sender] = { results: data.results, step: "selection" };
+
+        let menuMsg = `🎬 *VEXTER-MD MOVIE SEARCH*\n\n`;
+        data.results.forEach((movie, i) => {
+            menuMsg += `*${i + 1}.* ${movie.title} (${movie.year})\n`;
         });
-        
-        const $ = cheerio.load(res.data);
-        const results = [];
+        menuMsg += `\n*Reply with the number to see details.*`;
 
-        // සයිට් එකේ අලුත්ම HTML Structure එකට අනුව (මෙතනයි වෙනස තියෙන්නේ)
-        $('article.result-item').each((i, el) => {
-            if (i < 10) {
-                const title = $(el).find('.details .title a').text().trim();
-                const url = $(el).find('.details .title a').attr('href');
-                const image = $(el).find('.image img').attr('src');
-                const year = $(el).find('.details .meta span.year').text().trim();
+        await reply(menuMsg);
 
-                if (url) {
-                    results.push({ title: `${title} (${year})`, url, image });
+        // --- Reply Handler එක Register කිරීම ---
+        replyHandlers.push({
+            filter: (text, { sender: s }) => s === sender && global.movie_api_sessions[s] && !isNaN(text),
+            function: async (conn, mek, m, { body }) => {
+                const session = global.movie_api_sessions[sender];
+                const index = parseInt(body.trim()) - 1;
+                const movie = session.results[index];
+
+                if (session.step === "selection" && movie) {
+                    let details = `🎬 *${movie.title}*\n\n`;
+                    details += `⭐ *IMDb:* ${movie.imdb}\n`;
+                    details += `⏱️ *Runtime:* ${movie.runtime}\n`;
+                    details += `📅 *Year:* ${movie.year}\n`;
+                    details += `🎭 *Genres:* ${movie.genres.join(", ")}\n\n`;
+                    details += `📝 *Story:* ${movie.description.substring(0, 250)}...\n\n`;
+                    details += `📍 *Cast:* ${movie.cast.join(", ")}\n\n`;
+                    details += `*Download Links:*\n`;
+                    
+                    movie.dl_links.forEach((link, i) => {
+                        details += `*${i + 1}.* ${link.quality} (${link.size})\n`;
+                    });
+                    details += `\n*Reply with the number to get the document.*`;
+
+                    session.step = "download";
+                    session.selectedMovie = movie;
+
+                    await conn.sendMessage(from, { image: { url: movie.thumbnail }, caption: details }, { quoted: mek });
+
+                } else if (session.step === "download" && movie === undefined) {
+                    // Download logic (අංකය අනුව ලින්ක් එක තෝරාගැනීම)
+                    const selectedLink = session.selectedMovie.dl_links[parseInt(body.trim()) - 1];
+                    if (!selectedLink) return;
+
+                    reply(`*⬇️ Uploading ${session.selectedMovie.title}...*`);
+                    
+                    const fileId = selectedLink.url.split('/').pop();
+                    const directUrl = `https://pixeldrain.com/api/file/${fileId}?download`;
+
+                    await conn.sendMessage(from, {
+                        document: { url: directUrl },
+                        mimetype: "video/mp4",
+                        fileName: `${session.selectedMovie.title}.mp4`,
+                        caption: `🎬 *${session.selectedMovie.title}*\n📊 Quality: ${selectedLink.quality}\n\n*POWERED BY VEXTER-MD*`
+                    }, { quoted: mek });
+
+                    delete global.movie_api_sessions[sender];
                 }
             }
         });
 
-        if (results.length === 0) return reply("❌ No movies found for your search.");
-
-        // Session එක Save කරගැනීම
-        global.movie_sessions[sender] = { results, step: "selection" };
-
-        let msg = "🎬 *VEXTER-MD MOVIE SEARCH*\n\n";
-        results.forEach((m, i) => {
-            msg += `*${i + 1}.* ${m.title}\n`;
-        });
-        msg += "\n*Reply with the number to select the movie.*";
-        
-        reply(msg);
     } catch (e) {
         console.error(e);
-        reply("❌ Error: Site might be down or structure changed.");
+        reply("❌ API සම්බන්ධතාවයේ දෝෂයකි.");
     }
 });
-
-// 2. Reply Handler (අංකයට අනුව වැඩ කරන කොටස)
-const movieReplyHandler = {
-    filter: (text, { sender }) => global.movie_sessions[sender] && !isNaN(text),
-    function: async (conn, mek, m, { body, sender, reply, from }) => {
-        const session = global.movie_sessions[sender];
-        const index = parseInt(body.trim()) - 1;
-        const selected = session.results[index];
-
-        if (!selected) return;
-
-        try {
-            if (session.step === "selection") {
-                reply(`*⏳ Loading details for ${selected.title}...*`);
-                
-                const res = await axios.get(selected.url);
-                const $ = cheerio.load(res.data);
-                
-                const pixeldrainLinks = [];
-                // Pixeldrain Download Table එක Scrape කිරීම
-                $('.download-links-container table tbody tr').each((i, el) => {
-                    const link = $(el).find('a[href*="pixeldrain.com"]').attr('href');
-                    const quality = $(el).find('td').eq(0).text().trim(); // පළමු Column එක (Quality)
-                    const size = $(el).find('td').eq(2).text().trim();    // තුන්වන Column එක (Size)
-                    
-                    if (link) pixeldrainLinks.push({ link, quality, size });
-                });
-
-                if (pixeldrainLinks.length === 0) return reply("❌ Sorry, no Pixeldrain links found for this movie.");
-
-                session.links = pixeldrainLinks;
-                session.step = "quality";
-                session.movieTitle = selected.title;
-
-                let qMsg = `🎬 *${selected.title}*\n\n*Select Quality to Download:*\n`;
-                pixeldrainLinks.forEach((l, i) => {
-                    qMsg += `*${i + 1}.* ${l.quality} - ${l.size}\n`;
-                });
-                qMsg += "\n*Reply with the number to get the file.*";
-                
-                reply(qMsg);
-
-            } else if (session.step === "quality") {
-                const linkObj = session.links[index];
-                if (!linkObj) return;
-
-                // Pixeldrain Direct Link එක හදාගැනීම
-                const fileId = linkObj.link.split('/').pop();
-                const directUrl = `https://pixeldrain.com/api/file/${fileId}?download`;
-
-                reply(`*⬇️ Sending Movie: ${session.movieTitle}*\n*Quality:* ${linkObj.quality}\n\n*Please wait, this may take a few minutes...*`);
-
-                await conn.sendMessage(from, {
-                    document: { url: directUrl },
-                    mimetype: "video/mp4",
-                    fileName: `${session.movieTitle}.mp4`,
-                    caption: `🎬 *${session.movieTitle}*\n📊 Quality: ${linkObj.quality}\n💾 Size: ${linkObj.size}\n\n*POWERED BY VEXTER-MD*`
-                }, { quoted: mek });
-
-                delete global.movie_sessions[sender]; // වැඩේ ඉවර නිසා මැකීම
-            }
-        } catch (e) {
-            console.error(e);
-            reply("❌ Error while fetching download links.");
-        }
-    }
-};
-
-// Reply handler එක Register කිරීම
-if (global.replyHandlers) global.replyHandlers.push(movieReplyHandler);
