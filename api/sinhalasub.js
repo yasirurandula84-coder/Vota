@@ -19,7 +19,7 @@ async function getMovieData(query) {
                     const innerRes = await axios.get(movieUrl, { 
                         headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' } 
                     });
-                    const html = innerRes.data;
+                    const html = innerRes.data; // මුළු පිටුවේම HTML එක string එකක් විදිහට ගන්නවා
                     const $$ = cheerio.load(html);
 
                     let finalYear = "N/A";
@@ -28,52 +28,44 @@ async function getMovieData(query) {
 
                     const dl_links = [];
 
-                    // --- DOWNLOAD LINKS SCRAPING START ---
-                    // ක්‍රමය 1: සියලුම <a> ටැග් පරීක්ෂා කිරීම (Redirect සහ Direct)
-                    $$('a').each((i, linkTag) => {
-                        const href = $$(linkTag).attr('href') || "";
-                        let pixelId = "";
+                    // --- ක්‍රමය 1: මුළු HTML එක ඇතුළේම Pixeldrain IDs සෙවීම (Regex) ---
+                    // Pixeldrain ID එකක් කියන්නේ /u/ එකට පස්සේ එන අකුරු සහ ඉලක්කම් 10ක් වගේ ප්‍රමාණයක්
+                    const pixeldrainRegex = /pixeldrain\.com\/u\/([a-zA-Z0-9]+)/g;
+                    let match;
+                    while ((match = pixeldrainRegex.exec(html)) !== null) {
+                        const pixelId = match[1];
+                        const fullUrl = `https://pixeldrain.com/u/${pixelId}`;
 
-                        // Pixeldrain Direct Link එකක් නම්
-                        if (href.includes('pixeldrain.com/u/')) {
-                            pixelId = href.split('/u/')[1].split('?')[0];
-                        } 
-                        // Sinhalasub Redirect Link එකක් නම් (Base64 හෝ URL encoded)
-                        else if (href.includes('link=')) {
-                            const encoded = href.split('link=')[1].split('&')[0];
-                            try {
-                                const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
-                                if (decoded.includes('pixeldrain.com/u/')) {
-                                    pixelId = decoded.split('/u/')[1].split('?')[0];
-                                }
-                            } catch (e) {
-                                if (decodeURIComponent(encoded).includes('pixeldrain.com/u/')) {
-                                    pixelId = decodeURIComponent(encoded).split('/u/')[1].split('?')[0];
-                                }
-                            }
-                        }
-
-                        if (pixelId) {
-                            // ලින්ක් එක තියෙන Row එකේ Quality එක සෙවීම
-                            const rowText = $$(linkTag).closest('tr').text().toLowerCase() || $$(linkTag).text().toLowerCase();
+                        // එකම ලින්ක් එක ආයෙත් වැටීම වැළැක්වීම
+                        if (!dl_links.some(l => l.url === fullUrl)) {
+                            // ලින්ක් එක තිබුණු තැන අවට පීරලා Quality එක සෙවීම
+                            const context = html.substring(match.index - 200, match.index).toLowerCase();
                             let quality = "HD";
-                            if (rowText.includes('480')) quality = "480p";
-                            else if (rowText.includes('720')) quality = "720p";
-                            else if (rowText.includes('1080')) quality = "1080p";
+                            if (context.includes('480')) quality = "480p";
+                            else if (context.includes('720')) quality = "720p";
+                            else if (context.includes('1080')) quality = "1080p";
 
-                            const size = $$(linkTag).closest('tr').find('td').eq(2).text().trim() || "N/A";
-
-                            // එකම ලින්ක් එක දෙපාරක් වැටීම වැළැක්වීම
-                            if (!dl_links.some(l => l.url.includes(pixelId))) {
-                                dl_links.push({
-                                    quality: quality,
-                                    size: size,
-                                    url: `https://pixeldrain.com/u/${pixelId}`
-                                });
-                            }
+                            dl_links.push({ quality, size: "N/A", url: fullUrl });
                         }
-                    });
-                    // --- DOWNLOAD LINKS SCRAPING END ---
+                    }
+
+                    // --- ක්‍රමය 2: Base64 Redirects Decode කිරීම (කලින් ක්‍රමය) ---
+                    if (dl_links.length === 0) {
+                        const base64Regex = /link=([a-zA-Z0-9+/=]+)/g;
+                        let b64Match;
+                        while ((b64Match = base64Regex.exec(html)) !== null) {
+                            try {
+                                const decoded = Buffer.from(b64Match[1], 'base64').toString('utf-8');
+                                if (decoded.includes('pixeldrain.com/u/')) {
+                                    const pId = decoded.split('/u/')[1].split('?')[0];
+                                    const pUrl = `https://pixeldrain.com/u/${pId}`;
+                                    if (!dl_links.some(l => l.url === pUrl)) {
+                                        dl_links.push({ quality: "HD", size: "N/A", url: pUrl });
+                                    }
+                                }
+                            } catch (e) {}
+                        }
+                    }
 
                     results.push({
                         title: title.replace(' - Sinhala Subtitles', '').trim(),
