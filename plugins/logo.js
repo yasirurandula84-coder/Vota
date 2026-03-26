@@ -185,7 +185,7 @@ for (const [effectName, effectInfo] of Object.entries(effects)) {
 
             await conn.sendMessage(from, {
                 image: { url: result.imageUrl },
-                caption: `*VERTEX MD*✨ ${effectName.charAt(0).toUpperCase() + effectName.slice(1)}: ${text}`
+                caption: `✨ ${effectName.charAt(0).toUpperCase() + effectName.slice(1)}: ${text}`
             });
 
         } catch (e) {
@@ -297,7 +297,7 @@ cmd({
 
         await conn.sendMessage(from, {
             image: { url: result.imageUrl },
-            caption: `*VERTEX MD*✨ ${randomEffect.charAt(0).toUpperCase() + randomEffect.slice(1)}: ${text}\n🎲 Random Effect`
+            caption: `✨ ${randomEffect.charAt(0).toUpperCase() + randomEffect.slice(1)}: ${text}\n🎲 Random Effect`
         });
 
     } catch (e) {
@@ -356,7 +356,7 @@ cmd({
                     // Send each logo as it's created
                     await conn.sendMessage(from, {
                         image: { url: result.imageUrl },
-                        caption: ` VERTEX MD*✨ ${effect}: ${text} (${createdLogos.length}/${validEffects.length})`
+                        caption: `✨ ${effect}: ${text} (${createdLogos.length}/${validEffects.length})`
                     });
                     
                     // Small delay to avoid rate limiting
