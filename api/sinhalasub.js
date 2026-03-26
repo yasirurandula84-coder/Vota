@@ -3,7 +3,6 @@ const cheerio = require('cheerio');
 
 async function getMovieData(query) {
     try {
-        // සයිට් එකේ සර්ච් එක වෙනුවට RSS Feed එක පාවිච්චි කිරීම (Bypass Blocks)
         const searchUrl = `https://sinhalasub.lk/feed/?s=${encodeURIComponent(query)}`;
         const { data } = await axios.get(searchUrl, {
             headers: { 'User-Agent': 'Mozilla/5.0' }
@@ -11,8 +10,6 @@ async function getMovieData(query) {
 
         const $ = cheerio.load(data, { xmlMode: true });
         const results = [];
-
-        // RSS එකේ තියෙන Items ලූප් කිරීම
         const items = $('item').get().slice(0, 5);
 
         for (const el of items) {
@@ -21,43 +18,39 @@ async function getMovieData(query) {
             
             if (movieUrl) {
                 try {
-                    // විස්තර ලබා ගැනීමට පෝස්ට් එක ඇතුළට යාම
                     const innerRes = await axios.get(movieUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
                     const $$ = cheerio.load(innerRes.data);
 
-                    // Image එක සොයාගැනීම (Thumbnail)
-                    const thumb = $$('meta[property="og:image"]').attr('content') || $$('.wp-post-image').attr('src');
-
-                    // Pixeldrain ලින්ක්ස් පෙරීම
+                    const thumb = $$('meta[property="og:image"]').attr('content');
+                    
+                    // ඩවුන්ලෝඩ් ලින්ක්ස් ගන්නා ආකාරය (Pixeldrain)
                     const dl_links = [];
-                    $$('table tbody tr').each((i, row) => {
-                        const px = $$(row).find('a[href*="pixeldrain.com"]').attr('href');
-                        if (px) {
-                            dl_links.push({
-                                quality: $$(row).find('td').first().text().trim() || "HD",
-                                size: $$(row).find('td').eq(2).text().trim() || "N/A",
-                                url: px
-                            });
-                        }
+                    $$('a[href*="pixeldrain.com"]').each((i, link) => {
+                        const url = $$(link).attr('href');
+                        // ලින්ක් එක තියෙන Row එකේ විස්තර ගැනීම
+                        const row = $$(link).closest('tr');
+                        const quality = row.find('td').first().text().trim() || "HD";
+                        const size = row.find('td').eq(2).text().trim() || "Unknown";
+                        
+                        dl_links.push({ quality, size, url });
                     });
 
                     results.push({
-                        title: title.replace(' - Sinhala Subtitles', ''),
+                        title: title.replace(' - Sinhala Subtitles', '').trim(),
                         link: movieUrl,
                         thumbnail: thumb,
                         imdb: $$('.data-imdb').text().replace('IMDb:', '').trim() || "N/A",
-                        year: $$('.year').first().text().trim() || "N/A",
+                        year: $$('.date, .year').first().text().trim().split(',').pop().trim() || "N/A",
                         description: $$('.wp-content p').first().text().trim().substring(0, 300) + "...",
                         genres: $$('.details-genre a').map((i, g) => $$(g).text()).get(),
                         cast: $$('.info-col p:contains("Stars:") a').map((i, s) => $$(s).text()).get(),
-                        dl_links
+                        dl_links: dl_links
                     });
                 } catch (e) { continue; }
             }
         }
         return results;
     } catch (err) {
-        console.error("Scraper Error:", err.message);
         return [];
     }
 }
