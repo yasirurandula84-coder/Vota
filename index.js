@@ -89,7 +89,7 @@ async function connectToWA() {
 
       const up = `VEXTER-MD connected ✅\n\nPREFIX: ${prefix}`;
       await danuwa.sendMessage(ownerNumber[0] + "@s.whatsapp.net", {
-        image: { url: `https://ibb.co/RTjVjW5W` },
+        image: { url: `https://i.ibb.co/ZRXhhYxH/db1c9ed7-6513-49da-8105-f21c73583135.png` },
         caption: up
       });
 
