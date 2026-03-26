@@ -5,16 +5,12 @@ const yts = require("yt-search");
 
 
 async function getYoutube(query) {
-  const isUrl = /(youtube\.com|youtu\.be)/i.test(query);
-  if (isUrl) {
-    const id = query.split("v=")[1] || query.split("/").pop();
-    const info = await yts({ videoId: id });
-    return info;
-  }
-
-  const search = await yts(query);
-  if (!search.videos.length) return null;
-  return search.videos[0];
+    try {
+        const search = await yts(query);
+        return search.videos.length > 0 ? search.videos[0] : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 
@@ -22,6 +18,7 @@ cmd(
   {
     pattern: "ytmp3",
     alias: ["yta", "song"],
+    react: "🎵",
     desc: "Download YouTube MP3 by name or link",
     category: "download",
     filename: __filename,
@@ -74,6 +71,7 @@ cmd(
   {
     pattern: "ytmp4",
     alias: ["ytv", "video"],
+    react: "🎥",
     desc: "Download YouTube MP4 by name or link",
     category: "download",
     filename: __filename,
@@ -135,6 +133,7 @@ cmd(
   {
     pattern: "tiktok",
     alias: ["tt"],
+    react: "☢️",
     desc: "Download TikTok video",
     category: "download",
     filename: __filename,
