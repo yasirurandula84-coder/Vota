@@ -29,6 +29,7 @@ const port = process.env.PORT || 8000;
 const prefix = '.';
 const ownerNumber = ['94704421963'];
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
+const { getMovieData } = require('./api/sinhalasub');
 
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
