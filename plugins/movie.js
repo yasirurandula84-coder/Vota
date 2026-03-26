@@ -1,91 +1,84 @@
-const { cmd, commands, replyHandlers } = require("../command");
-const axios = require("axios");
-
-// තාවකාලිකව දත්ත ගබඩා කිරීමට (Sessions)
-global.movie_api_sessions = global.movie_api_sessions || {};
+const axios = require('axios');
+const cheerio = require('cheerio');
+const { cmd } = require('../command'); // ඔයාගේ බොට් එකේ Command Handler එක අනුව මෙය වෙනස් කරන්න
 
 cmd({
     pattern: "movie",
-    alias: ["film", "cinema"],
-    category: "movie",
-    react: "🎬",
-    desc: "Search movies using VEXTER-MD API"
-}, async (conn, mek, m, { from, q, reply, sender }) => {
-    if (!q) return reply("🎬 කරුණාකර චිත්‍රපටයේ නම ලබා දෙන්න. (උදා: .movie Avatar)");
-
+    alias: ["film", "sinhalasub"],
+    desc: "Search movies from Sinhalasub.lk",
+    category: "download",
+    filename: __filename
+},
+async (conn, mek, m, { from, q, reply }) => {
     try {
-        await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
+        if (!q) return reply("කරුණාකර සොයන චිත්‍රපටයේ නම ලබා දෙන්න. (උදා: .movie Avatar)");
 
-        // ඔයා දැන් හදපු API එකට Call කරනවා (Render එකේදී localhost පාවිච්චි කළ හැක)
-        const apiUrl = `http://localhost:8000/api/movie?q=${encodeURIComponent(q)}`;
-        const response = await axios.get(apiUrl);
-        const data = response.data;
+        await reply("🔎 සෙවුම් කරමින් පවතී, කරුණාකර රැඳී සිටින්න...");
 
-        if (!data.status || data.results.length === 0) return reply("❌ කිසිදු ප්‍රතිඵලයක් හමු නොවීය.");
-
-        // සෙවුම් ප්‍රතිඵල Session එකට දානවා
-        global.movie_api_sessions[sender] = { results: data.results, step: "selection" };
-
-        let menuMsg = `🎬 *VEXTER-MD MOVIE SEARCH*\n\n`;
-        data.results.forEach((movie, i) => {
-            menuMsg += `*${i + 1}.* ${movie.title} (${movie.year})\n`;
+        // 1. Search Results ලබා ගැනීම
+        const searchUrl = `https://sinhalasub.lk/?s=${encodeURIComponent(q)}`;
+        const { data } = await axios.get(searchUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
         });
-        menuMsg += `\n*Reply with the number to see details.*`;
 
-        await reply(menuMsg);
+        const $ = cheerio.load(data);
+        const results = [];
 
-        // --- Reply Handler එක Register කිරීම ---
-        replyHandlers.push({
-            filter: (text, { sender: s }) => s === sender && global.movie_api_sessions[s] && !isNaN(text),
-            function: async (conn, mek, m, { body }) => {
-                const session = global.movie_api_sessions[sender];
-                const index = parseInt(body.trim()) - 1;
-                const movie = session.results[index];
+        // පළමු ප්‍රතිඵල 5 පමණක් ලබා ගැනීම
+        $('article, .result-item').get().slice(0, 5).forEach((el) => {
+            const title = $(el).find('h2 a, .title a').text().trim();
+            const link = $(el).find('h2 a, .title a').attr('href');
+            const thumb = $(el).find('img').attr('src');
+            if (link) results.push({ title, link, thumb });
+        });
 
-                if (session.step === "selection" && movie) {
-                    let details = `🎬 *${movie.title}*\n\n`;
-                    details += `⭐ *IMDb:* ${movie.imdb}\n`;
-                    details += `⏱️ *Runtime:* ${movie.runtime}\n`;
-                    details += `📅 *Year:* ${movie.year}\n`;
-                    details += `🎭 *Genres:* ${movie.genres.join(", ")}\n\n`;
-                    details += `📝 *Story:* ${movie.description.substring(0, 250)}...\n\n`;
-                    details += `📍 *Cast:* ${movie.cast.join(", ")}\n\n`;
-                    details += `*Download Links:*\n`;
-                    
-                    movie.dl_links.forEach((link, i) => {
-                        details += `*${i + 1}.* ${link.quality} (${link.size})\n`;
-                    });
-                    details += `\n*Reply with the number to get the document.*`;
+        if (results.length === 0) return reply("❌ කිසිදු ප්‍රතිඵලයක් හමු නොවීය.");
 
-                    session.step = "download";
-                    session.selectedMovie = movie;
+        // 2. පළමු ප්‍රතිඵලයට අදාළ විස්තර සහ Pixeldrain ලින්ක් එක ගැනීම
+        // (මෙතනදී අපි පළමු රිසල්ට් එකේ විස්තර පෙන්වනවා)
+        const moviePage = await axios.get(results[0].link, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const $$ = cheerio.load(moviePage.data);
+        const innerHtml = moviePage.data;
 
-                    await conn.sendMessage(from, { image: { url: movie.thumbnail }, caption: details }, { quoted: mek });
-
-                } else if (session.step === "download" && movie === undefined) {
-                    // Download logic (අංකය අනුව ලින්ක් එක තෝරාගැනීම)
-                    const selectedLink = session.selectedMovie.dl_links[parseInt(body.trim()) - 1];
-                    if (!selectedLink) return;
-
-                    reply(`*⬇️ Uploading ${session.selectedMovie.title}...*`);
-                    
-                    const fileId = selectedLink.url.split('/').pop();
-                    const directUrl = `https://pixeldrain.com/api/file/${fileId}?download`;
-
-                    await conn.sendMessage(from, {
-                        document: { url: directUrl },
-                        mimetype: "video/mp4",
-                        fileName: `${session.selectedMovie.title}.mp4`,
-                        caption: `🎬 *${session.selectedMovie.title}*\n📊 Quality: ${selectedLink.quality}\n\n*POWERED BY VEXTER-MD*`
-                    }, { quoted: mek });
-
-                    delete global.movie_api_sessions[sender];
-                }
+        // Pixeldrain ලින්ක්ස් සෙවීම (Regex)
+        const dl_links = [];
+        const pdRegex = /pixeldrain\.com\/u\/([a-zA-Z0-9]+)/g;
+        let match;
+        while ((match = pdRegex.exec(innerHtml)) !== null) {
+            const pUrl = `https://pixeldrain.com/u/${match[1]}`;
+            if (!dl_links.some(l => l.url === pUrl)) {
+                dl_links.push({ url: pUrl });
             }
-        });
+        }
+
+        // අවුරුද්ද සෙවීම
+        const year = results[0].title.match(/\d{4}/) ? results[0].title.match(/\d{4}/)[0] : "N/A";
+        const imdb = $$('.data-imdb').text().replace('IMDb:', '').trim() || "N/A";
+
+        // 3. WhatsApp පණිවිඩය සකස් කිරීම
+        let msg = `🎬 *${results[0].title.replace(' - Sinhala Subtitles', '').trim()}*\n\n`;
+        msg += `🗓️ *Year:* ${year}\n`;
+        msg += `⭐ *IMDb:* ${imdb}\n\n`;
+        msg += `📥 *Download Links:* \n`;
+
+        if (dl_links.length > 0) {
+            dl_links.forEach((link, i) => {
+                msg += `${i + 1}. ${link.url}\n`;
+            });
+        } else {
+            msg += `_ඩවුන්ලෝඩ් ලින්ක්ස් හමු නොවීය. සයිට් එකට ගොස් පරීක්ෂා කරන්න._\n`;
+        }
+
+        msg += `\n🔗 *Link:* ${results[0].link}\n\n*VEXTER-MD*`;
+
+        // පින්තූරය සමඟ පණිවිඩය යැවීම
+        await conn.sendMessage(from, { 
+            image: { url: results[0].thumb }, 
+            caption: msg 
+        }, { quoted: mek });
 
     } catch (e) {
-        console.error(e);
-        reply("❌ API සම්බන්ධතාවයේ දෝෂයකි.");
+        console.log(e);
+        reply("❌ දෝෂයක් සිදුවිය: " + e.message);
     }
 });
