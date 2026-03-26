@@ -1,4 +1,3 @@
-
 const { cmd } = require("../command");
 const axios = require("axios");
 
@@ -41,7 +40,7 @@ cmd(
         from,
         {
           image: {
-            url: "https://i.ibb.co/ZRXhhYxH/db1c9ed7-6513-49da-8105-f21c73583135.png",
+            url: "",
           },
           caption: header,
         },
@@ -73,4 +72,3 @@ cmd(
 );
 
 
-          
