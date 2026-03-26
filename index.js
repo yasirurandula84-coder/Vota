@@ -29,7 +29,6 @@ const port = process.env.PORT || 8000;
 const prefix = '.';
 const ownerNumber = ['94704421963'];
 const credsPath = path.join(__dirname, '/auth_info_baileys/creds.json');
-const { getMovieData } = require('./api/sinhalasub');
 
 async function ensureSessionFile() {
   if (!fs.existsSync(credsPath)) {
@@ -179,13 +178,5 @@ async function connectToWA() {
 
 ensureSessionFile();
 
-app.get("/api/movie", async (req, res) => {
-    const q = req.query.q;
-    const data = await getMovieData(q);
-    
-    console.log("API Requested for:", q);
-    console.log("Results Found:", data.length); // මෙතන 0 ට වඩා වැඩි අගයක් එන්න ඕනේ
-    
-    res.json({ status: true, results: data });
-});
+
 app.listen(port, () => console.log(`Server listening on http://localhost:${port}`));
