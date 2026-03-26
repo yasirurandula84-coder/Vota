@@ -17,7 +17,8 @@ cmd({
         await conn.sendMessage(from, { react: { text: "🔍", key: mek.key } });
 
         // ඔයා දැන් හදපු API එකට Call කරනවා (Render එකේදී localhost පාවිච්චි කළ හැක)
-        const apiUrl = `http://localhost:8000/api/movie?q=${encodeURIComponent(q)}`;
+        // movie.js ඇතුළත apiUrl එක මෙසේ ලියන්න:
+const apiUrl = `http://localhost:${process.env.PORT || 8000}/api/movie?q=${encodeURIComponent(q)}`;
         const response = await axios.get(apiUrl);
         const data = response.data;
 
