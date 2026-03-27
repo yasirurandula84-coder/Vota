@@ -39,6 +39,7 @@
     "@xaviabot/fb-downloader": "^1.0.14",
     "mathjs": "^15.1.1",
     "sharp": "^0.34.5",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "mongoose": "^9.3.3"
   }
 }
