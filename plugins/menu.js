@@ -60,7 +60,7 @@ cmd({
   let cmdText = `*${selectedCategory} COMMANDS*\n`;
   cmdsInCategory.forEach(c => {
     const patterns = [c.pattern, ...(c.alias || [])].filter(Boolean).map(p => `.${p}`);
-    cmdText += `${patterns.join(", ")} - ${c.desc || "No description"}\n`;
+    cmdText += `🛡️ ${patterns.join(", ")} - ${c.desc || "No description"}\n`;
   });
   cmdText += `───────────────────────\n`;
   cmdText += `Total Commands: ${cmdsInCategory.length}\n`;
