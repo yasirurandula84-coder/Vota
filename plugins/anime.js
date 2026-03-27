@@ -1,13 +1,16 @@
 const { cmd } = require("../command");
 const fetch = require("node-fetch");
 
+// Parana fetch require eka ain karala meka danna
+const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 async function getJSON(url) {
   try {
     const res = await fetch(url);
-    return res.ok ? await res.json() : null;
+    // API eka wada nathnam error ekak nodi null return karanawa
+    if (!res.ok) return null; 
+    return await res.json();
   } catch (e) {
-    console.error("API Fetch Error:", e);
     return null;
   }
 }
