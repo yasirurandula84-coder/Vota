@@ -78,7 +78,7 @@ cmd({
 
     await danuwa.sendMessage(
       from,
-      { image: fs.readFileSync(outFile), caption: "🖼️ Collage created by *danuwa-MD*" },
+      { image: fs.readFileSync(outFile), caption: "🖼️ Collage created by *VERTEX-MD*" },
       { quoted: mek }
     );
 
