@@ -222,6 +222,14 @@ if (mek.key?.remoteJid === 'status@broadcast') {
     }
   }
 }
+    // index.js එකේ command handle කරන තැනට මේක දාන්න
+const mode = config.WORK_MODE.toLowerCase();
+
+if (!isOwner) {
+    if (mode === "private") return; // කිසිම දෙයක් කරන්නේ නැහැ
+    if (mode === "groups" && !m.isGroup) return; // ඉන්බොක්ස් නම් බ්ලොක් කරනවා
+    if (mode === "inbox" && m.isGroup) return; // ගෲප් නම් බ්ලොක් කරනවා
+}
     
 
     const m = sms(danuwa, mek);
