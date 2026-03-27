@@ -222,15 +222,6 @@ if (mek.key?.remoteJid === 'status@broadcast') {
     }
   }
 }
-    // index.js එකේ command handle කරන තැනට මේක දාන්න
-const mode = config.WORK_MODE.toLowerCase();
-
-if (!isOwner) {
-    if (mode === "private") return; // කිසිම දෙයක් කරන්නේ නැහැ
-    if (mode === "groups" && !m.isGroup) return; // ඉන්බොක්ස් නම් බ්ලොක් කරනවා
-    if (mode === "inbox" && m.isGroup) return; // ගෲප් නම් බ්ලොක් කරනවා
-}
-    
 
     const m = sms(danuwa, mek);
     const type = getContentType(mek.message);
@@ -249,6 +240,16 @@ if (!isOwner) {
     const isMe = botNumber.includes(senderNumber);
     const isOwner = ownerNumber.includes(senderNumber) || isMe;
     const botNumber2 = await jidNormalizedUser(danuwa.user.id);
+
+    // --- WORK MODE CHECK START ---
+const mode = (config.WORK_MODE || "public").toLowerCase();
+
+if (!isOwner) {
+    if (mode === "private") return; // අයිතිකරු නොවන අයට ප්‍රයිවට් මොඩ් එකේදී මැසේජ් රිප්ලයි කරන්නේ නැත.
+    if (mode === "groups" && !isGroup) return; // ගෲප් මොඩ් එකේදී ඉන්බොක්ස් මැසේජ් රිප්ලයි කරන්නේ නැත.
+    if (mode === "inbox" && isGroup) return; // ඉන්බොක්ස් මොඩ් එකේදී ගෲප් මැසේජ් රිප්ලයි කරන්නේ නැත.
+}
+// --- WORK MODE CHECK END ---
 
     const groupMetadata = isGroup ? await danuwa.groupMetadata(from).catch(() => {}) : '';
     const groupName = isGroup ? groupMetadata.subject : '';
