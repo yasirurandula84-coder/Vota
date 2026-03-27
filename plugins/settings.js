@@ -1,5 +1,5 @@
 const { cmd } = require("../command");
-const Settings = require("../models/settings"); // Schema path eka check karන්න
+const Settings = require("../lib/settings"); // Schema path eka check karන්න
 
 cmd(
   {
